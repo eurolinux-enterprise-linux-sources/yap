@@ -1,0 +1,116 @@
+/**********************************************************************
+                                                               
+                       The OPTYap Prolog system                
+  OPTYap extends the Yap Prolog system to support or-parallel tabling
+                                                               
+  Copyright:   R. Rocha and NCC - University of Porto, Portugal
+  File:        or.insts.i
+  version:     $Id: or.insts.i,v 1.4 2005/05/31 08:24:24 ricroc Exp $   
+                                                                     
+**********************************************************************/
+
+/* -------------------------------- **
+**      Scheduler instructions      **
+** -------------------------------- */
+
+  PBOp(getwork_first_time,e)
+    /* wait for a new parallel goal */
+    while (BITMAP_same(GLOBAL_bm_present_workers, GLOBAL_bm_finished_workers));
+    make_root_choice_point();  
+    PUT_IN_EXECUTING(worker_id);
+    /* wait until everyone else is executing! */
+    while (! BITMAP_same(GLOBAL_bm_present_workers, GLOBAL_bm_executing_workers));
+    SCHEDULER_GET_WORK();
+  shared_end:
+    PUT_IN_FINISHED(worker_id);
+    /* wait until everyone else is finished! */
+    while (! BITMAP_same(GLOBAL_bm_present_workers, GLOBAL_bm_finished_workers));
+    PUT_OUT_EXECUTING(worker_id);
+    if (worker_id == 0) {
+      finish_yapor();
+      free_root_choice_point();
+      /* wait until no one is executing */
+      while (! BITMAP_empty(GLOBAL_bm_executing_workers));
+      goto fail;
+    } else {
+      PREG = GETWORK_FIRST_TIME;
+      PREFETCH_OP(PREG);
+      GONext();
+    }
+  ENDPBOp();
+
+
+
+  PBOp(getwork,ld)
+#ifdef TABLING
+    if (DepFr_leader_cp(LOCAL_top_dep_fr) == LOCAL_top_cp) {
+      /* the current top node is a leader node with consumer nodes below */
+      if (DepFr_leader_dep_is_on_stack(LOCAL_top_dep_fr)) {
+        /*    the frozen branch depends on the current top node     **
+	** this means that the current top node is a generator node */
+        LOCK_OR_FRAME(LOCAL_top_or_fr);
+        if (OrFr_alternative(LOCAL_top_or_fr) == NULL ||
+           (OrFr_alternative(LOCAL_top_or_fr) == ANSWER_RESOLUTION && B_FZ != LOCAL_top_cp)) {
+          /*                 there are no unexploited alternatives                 **
+          ** (NULL if batched scheduling OR ANSWER_RESOLUTION if local scheduling) */
+          UNLOCK_OR_FRAME(LOCAL_top_or_fr);
+	  goto completion;
+        } else {
+          /*                     there are unexploited alternatives                     **
+	  ** we should exploit all the available alternatives before execute completion */
+          PREG = OrFr_alternative(LOCAL_top_or_fr);
+          PREFETCH_OP(PREG);
+          GONext();
+        }
+/* ricroc - obsolete
+#ifdef  batched scheduling
+        if (OrFr_alternative(LOCAL_top_or_fr) != NULL) {
+#else   local scheduling
+        if (OrFr_alternative(LOCAL_top_or_fr) != ANSWER_RESOLUTION || B_FZ == LOCAL_top_cp) {
+#endif
+          PREG = OrFr_alternative(LOCAL_top_or_fr);
+          PREFETCH_OP(PREG);
+          GONext();
+        }
+        UNLOCK_OR_FRAME(LOCAL_top_or_fr);
+*/
+      }
+      goto completion;
+    }
+#endif /* TABLING */
+    LOCK_OR_FRAME(LOCAL_top_or_fr);
+    if (OrFr_alternative(LOCAL_top_or_fr)) {
+      PREG = OrFr_alternative(LOCAL_top_or_fr);
+      PREFETCH_OP(PREG);
+      GONext();
+    } else {
+      UNLOCK_OR_FRAME(LOCAL_top_or_fr);
+      SCHEDULER_GET_WORK();
+    }
+  ENDPBOp();
+
+
+
+  /* The idea is to check whether we are the last worker in the node.
+     If we are, we can go ahead, otherwise we should call the scheduler. */
+  PBOp(getwork_seq,ld)
+    LOCK_OR_FRAME(LOCAL_top_or_fr);
+    if (OrFr_alternative(LOCAL_top_or_fr) &&
+        BITMAP_alone(OrFr_members(LOCAL_top_or_fr), worker_id)) {
+      PREG = OrFr_alternative(LOCAL_top_or_fr);
+      PREFETCH_OP(PREG);
+      GONext();
+    } else {
+      UNLOCK_OR_FRAME(LOCAL_top_or_fr);
+      SCHEDULER_GET_WORK();
+    }
+  ENDPBOp();
+
+
+
+  PBOp(sync,ld)
+    CUT_wait_leftmost();
+    PREG = NEXTOP(PREG, ld);
+    PREFETCH_OP(PREG);
+    GONext();
+  ENDPBOp();

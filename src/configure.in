@@ -1,0 +1,1438 @@
+dnl
+dnl Process this file with autoconf to produce a configure script.
+dnl
+
+AC_PREREQ(2.13)
+
+AC_INIT(console/yap.c)
+AC_CONFIG_HEADER(config.h)
+
+dnl store the environment's compilation flags
+mycflags="$CFLAGS"
+
+AC_PROG_CC
+AC_SUBST(GCC)
+AC_SUBST(C_INTERF_FLAGS)
+AC_SUBST(C_PARSER_FLAGS)
+
+AC_ARG_ENABLE(cut-c,
+	[ --enable-cut-c             support for executing c code when a cut occurs ],
+	cutc="$enableval", cutc=no)
+AC_ARG_ENABLE(tabling,
+	[ --enable-tabling           support tabling ],
+	tabling="$enableval", tabling=no)
+AC_ARG_ENABLE(or-parallelism,
+	[ --enable-or-parallelism    support or-parallelism as: env-copy,sba,a-cow ],
+	orparallelism="$enableval", orparallelism=no)
+AC_ARG_ENABLE(rational-trees,
+	[ --enable-rational-trees    support infinite rational trees ],
+	rationaltrees="$enableval" , rationaltrees=yes)
+AC_ARG_ENABLE(coroutining,
+	[ --enable-coroutining       support co-routining, attributed variables and constraints],
+	rationaltrees="$enableval";coroutining="$enableval", coroutining=yes)
+AC_ARG_ENABLE(depth-limit,
+	[ --enable-depth-limit       support depth-bound computation ],
+	depthlimit="$enableval", depthlimit=yes)
+AC_ARG_ENABLE(wam-profile,
+	[ --enable-wam-profile       support low level profiling of abstract machine ],
+	wamprofile="$enableval", wamprofile=no)
+AC_ARG_ENABLE(low-level-tracer,
+	[ --enable-low-level-tracer  support support for procedure-call tracing ],
+	lowleveltracer="$enableval", lowleveltracer=no)
+AC_ARG_ENABLE(threads,
+	[ --enable-threads           support system threads ],
+	threads="$enableval", threads=no)
+AC_ARG_ENABLE(pthread-locking,
+	[ --enable-pthread-locking   use pthread locking primitives for internal locking (requires threads)  ],
+	pthreadlocking="$enableval", pthreadlocking=no)
+AC_ARG_ENABLE(max-performance,
+	[ --enable-max-performance   try using the best flags for specific architecture ],
+	maxperformance="$enableval", maxperformance=no)
+AC_ARG_ENABLE(max-memory,
+	[ --enable-max-memory        try using the best flags for using the memory to the most ],
+	maxmemory="$enableval", maxmemory=yes)
+AC_ARG_ENABLE(debug-yap,
+	[ --enable-debug-yap         enable C-debugging for YAP ],
+	debugyap="$enableval", debugyap=no)
+AC_ARG_ENABLE(eam,
+	[ --enable-eam               enable EAM on YAP ],
+	eam="$enableval", eam=no)
+AC_ARG_ENABLE(cygwin,
+	[ --enable-cygwin            use cygwin library in WIN32 ],
+	cygwin="$enableval", cygwin=no)
+AC_ARG_ENABLE(dynamic_loading,
+	[ --enable-dynamic-loading   compile Yap as a DLL ],
+	dynamic_loading="$enableval", dynamic_loading=no)
+AC_ARG_ENABLE(use-malloc,
+	[ --enable-use-malloc        use malloc to allocate memory ],
+	use_malloc="$enableval", use_malloc=no)
+AC_ARG_ENABLE(condor,
+	[ --enable-condor            allow Yap to be used from condor ],
+	use_condor="$enableval", use_condor=no)
+	
+AC_ARG_ENABLE(april,
+	[ --enable-april             compile Yap to support April ILP system],
+	use_april="$enableval", use_april=no)
+
+AC_ARG_ENABLE(dlcompat,
+	[ --enable-dlcompat          use dlcompat library for dynamic loading on Mac OS X],
+	use_dlcompat="$enableval", use_dlcompat=no)
+
+AC_ARG_ENABLE(cplint,
+	[ --enable-cplint[=DIR]       enable the cplint library using the glu library in DIR/lib],
+		yap_cv_cplint=$enableval, yap_cv_cplint=no)
+
+AC_ARG_WITH(gmp,
+	[ --with-gmp[=DIR]           use GNU Multiple Precision in DIR],
+	if test "$withval" = yes; then
+		yap_cv_gmp=yes
+	elif test "$withval" = no; then
+		yap_cv_gmp=no
+	else
+		yap_cv_gmp=$with_gmp
+		LDFLAGS="$LDFLAGS -L${yap_cv_gmp}/lib"
+		CPPFLAGS="$CPPFLAGS -I${yap_cv_gmp}/include"
+	fi,
+	[yap_cv_gmp=yes])
+
+AC_ARG_ENABLE(myddas,
+	[ --enable-myddas[[=DIR]]      enable the MYDDAS library],
+	if test "$enableval" = yes; then
+		yap_cv_myddas=/usr/
+	elif test "$enableval" = no; then
+		yap_cv_myddas=no
+	else
+		yap_cv_myddas=$enable_myddas
+		LDFLAGS="$LDFLAGS -L${yap_cv_myddas}/lib "
+		CPPFLAGS="$CPPFLAGS -I${yap_cv_myddas}/include "
+	fi,
+	[yap_cv_myddas=no])
+
+AC_ARG_ENABLE(myddas-stats,
+	[ --enable-myddas-stats      enable the MYDDAS library statistics support],
+	if test "$yap_cv_myddas" = no; then
+		myddasstats=no
+	else
+		myddasstats="$enableval"
+	fi, myddasstats=no)
+
+AC_ARG_ENABLE(myddas-top-level,
+	[ --enable-myddas-top-level  enable the MYDDAS top-level support to MySQL],
+	if test "$yap_cv_myddas" = no; then
+	   	myddastoplevel=no
+	else
+		myddastoplevel="$enableval"
+	fi, myddastoplevel=no)
+
+AC_ARG_WITH(jpl,
+	[ --with-jpl=JAVA_HOME       use Java instalation in JAVA_HOME],
+	if test "$withval" = yes; then
+		yap_cv_jpl="$JAVA_HOME"
+		dynamic_loading=yes
+		maxmemory=yes
+dnl		threads=yes
+	elif test "$withval" = no; then
+		yap_cv_jpl=no
+	else
+		yap_cv_jpl=$with_jpl
+		dynamic_loading=yes
+		maxmemory=yes
+dnl		threads=yes
+	fi,
+	[yap_cv_jpl=no])
+
+AC_ARG_WITH(readline,
+	[ --with-readline[=DIR]      use GNU Readline Library in DIR],
+	if test "$withval" = yes; then
+		yap_cv_readline=yes
+	elif test "$withval" = no; then
+		yap_cv_readline=no
+	else
+		yap_cv_readline=$with_readline
+		LDFLAGS="$LDFLAGS -L${yap_cv_readline}/lib"
+		CPPFLAGS="$CPPFLAGS -I${yap_cv_readline}/include"
+	fi,
+	[yap_cv_readline=yes])
+
+AC_ARG_WITH(matlab,
+	[ --with-matlab[=DIR]      use MATLAB package in DIR],
+	if test "$withval" = yes; then
+		yap_cv_matlab=yes
+	elif test "$withval" = no; then
+		yap_cv_matlab=no
+	else
+		yap_cv_matlab=$with_matlab
+		MATLAB_INCLUDE="-I${yap_cv_matlab}/extern/include"
+	fi,
+	[yap_cv_matlab=no])
+
+AC_ARG_WITH(mpi,
+	[ --with-mpi[=DIR]           use MPI library in DIR],
+	if test "$withval" = yes; then
+		yap_cv_mpi=yes
+	elif test "$withval" = no; then
+		yap_cv_mpi=no
+	else
+		yap_cv_mpi=$with_mpi
+		LDFLAGS="$LDFLAGS -L${yap_cv_mpi}/lib"
+		CPPFLAGS="$CPPFLAGS -I${yap_cv_mpi}/include"
+	fi,
+	[yap_cv_mpi=no])
+
+
+AC_ARG_WITH(mpe,
+	[ --with-mpe[=DIR]           use MPE library in DIR],
+	if test "$withval" = yes; then
+		yap_cv_mpe=yes
+	elif test "$withval" = no; then
+		yap_cv_mpe=no
+	else
+		yap_cv_mpe=$with_mpe
+		LDFLAGS="$LDFLAGS -L${yap_cv_mpe}/lib"
+		CPPFLAGS="$CPPFLAGS -I${yap_cv_mpe}/include"
+	fi,
+	[yap_cv_mpe=no])
+
+AC_ARG_WITH(lam,
+	[ --with-lam[=DIR]           use LAM MPI library in DIR],
+	if test "$withval" = yes; then
+		yap_cv_lam=yes
+	elif test "$withval" = no; then
+		yap_cv_lam=no
+	else
+		yap_cv_lam=$with_lam
+		LDFLAGS="$LDFLAGS -L${yap_cv_lam}/lib/lam"
+		CPPFLAGS="$CPPFLAGS -I${yap_cv_lam}/include"
+	fi,
+	[yap_cv_lam=no])
+
+AC_ARG_WITH(heap-space,
+	[ --with-heap-space[=space]  default heap size in Kbytes],
+	if test "$withval" = yes; then
+		yap_cv_heap_space=0
+	elif test "$withval" = no; then
+		yap_cv_heap_space=0
+	else
+		yap_cv_heap_space=$withval
+	fi,
+	[yap_cv_heap_space=0])
+
+AC_ARG_WITH(stack-space,
+	[ --with-stack-space[=space] default stack size in Kbytes],
+	if test "$withval" = yes; then
+		yap_cv_stack_space=0
+	elif test "$withval" = no; then
+		yap_cv_stack_space=0
+	else
+		yap_cv_stack_space=$withval
+	fi,
+	[yap_cv_stack_space=0])
+
+AC_ARG_WITH(trail-space,
+	[ --with-trail-space[=space] default trail size in Kbytes],
+	if test "$withval" = yes; then
+		yap_cv_trail_space=0
+	elif test "$withval" = no; then
+		yap_cv_trail_space=0
+	else
+		yap_cv_trail_space=$withval
+	fi,
+	[yap_cv_trail_space=0])
+
+AC_ARG_WITH(max-workers,
+	[ --with-max-workers[=integer] maximum number of or-parallel processes],
+	if test "$withval" = yes; then
+	  yap_cv_max_workers="(8*SIZEOF_INT_P)"
+	elif test "$withval" = no; then
+	  yap_cv_max_workers="1"
+	else
+	  yap_cv_max_workers=$withval
+	fi,
+	[yap_cv_max_workers="(8*SIZEOF_INT_P)"])
+
+AC_ARG_WITH(max-threads,
+	[ --with-max-threads[=integer] maximum number of or-parallel processes],
+	if test "$withval" = yes; then
+	  yap_cv_max_threads="1024"
+	elif test "$withval" = no; then
+	  yap_cv_max_threads="1"
+	else
+	  yap_cv_max_threads=$withval
+	fi,
+	[yap_cv_max_threads="1024"])
+
+
+if test "$tabling" = yes -o "$orparallelism" = yes -o "$threads" = yes
+then
+  AC_DEFINE(MinHeapSpace, (1000*SIZEOF_INT_P))
+  AC_DEFINE(MinStackSpace,(300*SIZEOF_INT_P))
+  AC_DEFINE(MinTrailSpace,( 48*SIZEOF_INT_P))
+else
+  AC_DEFINE(MinHeapSpace, (300*SIZEOF_INT_P))
+  AC_DEFINE(MinStackSpace,(200*SIZEOF_INT_P))
+  AC_DEFINE(MinTrailSpace,( 32*SIZEOF_INT_P))
+fi
+
+eval "AC_DEFINE(DefHeapSpace,($yap_cv_heap_space))"
+eval "AC_DEFINE(DefStackSpace,($yap_cv_stack_space))"
+eval "AC_DEFINE(DefTrailSpace,($yap_cv_trail_space))"
+
+AC_CANONICAL_SYSTEM
+
+AC_DEFINE_UNQUOTED(HOST_ALIAS,"${target}")
+
+if test "$or-parallelism" = no
+then
+  AC_DEFINE(MAX_WORKERS,1)
+else
+eval "AC_DEFINE(MAX_WORKERS,$yap_cv_max_workers)"
+fi
+
+if test "$threads" = no
+then
+  AC_DEFINE(MAX_THREADS,1)
+else
+eval "AC_DEFINE(MAX_THREADS,$yap_cv_max_threads)"
+fi
+
+
+dnl condor does not like dynamic linking on Linux, DEC, and HP-UX platforms.
+if test "$yap_cv_matlab" = no 
+then
+  INSTALL_MATLAB="# "
+elif test "$yap_cv_matlab" = yes 
+then
+  INSTALL_MATLAB=""
+else
+  case "$target_cpu" in
+  i*86*)
+     LDFLAGS="$LDFLAGS -L${yap_cv_matlab}/bin/glnx86"
+  ;;
+  x86*)
+     LDFLAGS="$LDFLAGS -L${yap_cv_matlab}/bin/glnxa64"
+  ;;
+  sparc*)
+     LDFLAGS="$LDFLAGS -L${yap_cv_matlab}/bin/sol2"
+  ;;
+  esac
+  INSTALL_MATLAB=""
+fi
+
+dnl condor does not like dynamic linking on Linux, DEC, and HP-UX platforms.
+if test "$use_condor" = yes 
+then
+  use_malloc="yes"
+  CC="condor_compile $CC"
+  dnl no readline with condor.
+  yap_cv_readline="no"
+  AC_DEFINE(SUPPORT_CONDOR, 1)
+  STATIC_MODE=""
+else
+  STATIC_MODE="# "
+fi
+
+dnl Compilation Flags
+if test "$GCC" = "yes"
+then
+   if test -z "${mycflags}"
+   then
+     if test "$debugyap" = "yes" 
+     then
+       CFLAGS="-O -g -Wall -Wstrict-prototypes -Wmissing-prototypes"
+       C_INTERF_FLAGS="-O -g -Wall -Wstrict-prototypes -Wmissing-prototypes"
+     else
+       CFLAGS="-O3 -fomit-frame-pointer -Wall -Wstrict-prototypes -Wmissing-prototypes"
+       case "`$CC --version < /dev/null`" in	
+	  *3.4*) CFLAGS="-fno-gcse -fno-crossjumping $CFLAGS" ;;
+       esac
+       C_INTERF_FLAGS="-O3 -Wall -Wstrict-prototypes -Wmissing-prototypes"
+       C_PARSER_FLAGS="-O3 -Wall -Wstrict-prototypes -Wmissing-prototypes"
+       case "$target_cpu" in
+        i*86*)
+           CFLAGS="-DBP_FREE $CFLAGS"
+        ;;
+        sparc*)
+	  case "$target_os" in
+           *solaris[2-9]*)	dnl 
+             CFLAGS="-mno-app-regs -DOPTIMISE_ALL_REGS_FOR_SPARC=1 $CFLAGS"
+            ;;
+          esac
+        ;;
+       esac
+       if test "$tcpu"; then
+          target_cpu=$tcpu
+       fi
+       if test "$maxperformance" = "yes"
+       then
+         case "$target_cpu" in
+	  athlon)
+           CFLAGS="-march=athlon $CFLAGS"
+	  ;;
+          i686*)
+           CFLAGS="-march=i686 $CFLAGS"
+          ;;
+          i586*)
+           CFLAGS="-march=i586 $CFLAGS"
+          ;;
+          i486*)
+           CFLAGS="-march=i486 $CFLAGS"
+          ;;
+          i386*)
+           CFLAGS="-march=i386 $CFLAGS"
+          ;;
+         esac
+       fi
+     fi
+   fi
+   if test "$CC" = "sslittle-na-sstrix-gcc"
+   then
+    RANLIB="sslittle-na-sstrix-ranlib"
+    AR="sslittle-na-sstrix-ar"
+    CROSS_SIMULATOR="sim-fast"
+   fi
+else
+   if test -z "${mycflags}"
+   then
+     case "$target_cpu" in
+       i?86*)
+        if test "$CC" = "lcc"
+        then
+          CFLAGS="-A -A"
+        elif test "$CC" = "cl"
+        then
+          CFLAGS="/nologo"
+          CPP="/nologo /E"
+        fi
+        ;;
+       hppa*)
+        if test "$CC" = "cc" -o $CC = c89
+         then
+           if test "$debugyap" = "yes"
+           then
+             CFLAGS="-Ae -g -O"
+           else
+             CFLAGS="-Ae +O3 +Onolimit"
+           fi
+        fi
+dnl	LDFLAGS="+e UserCPredicate $LDFLAGS"
+        ;;
+     esac
+   fi
+   C_INTERF_FLAGS="$CFLAGS"
+   C_PARSER_FLAGS="$CFLAGS"
+fi
+
+dnl Checks for programs.
+AC_PROG_LN_S
+AC_PROG_INSTALL
+AC_PROG_RANLIB
+AC_CHECK_TOOL(INDENT,indent,:)
+AC_CHECK_TOOL(AR,ar,:)
+AC_CHECK_TOOL(MPI_CC,mpicc,:)
+AC_PATH_PROG(INSTALL_INFO,install-info,true,$PATH:/sbin:/usr/sbin:/usr/etc:/usr/local/sbin)
+AC_PATH_PROG(SHELL,sh)
+
+dnl Check for libraries.
+dnl mingw does not get along well with libm
+dnl cygnus and mingw32 also need wsock32 to use sockets.
+dnl
+if test "$target_os" = "cygwin"
+then
+  INSTALL_COMMAND=install_win32
+  if test "$cygwin" = "no"
+  then
+    CC="gcc  -mno-cygwin"
+    AC_CHECK_LIB(wsock32,main)
+    AC_CHECK_LIB(psapi,main)
+    yap_cv_readline=no
+    if test "$prefix" = "NONE"
+    then
+      prefix="\${SYSTEMDRIVE}/Yap"
+    fi
+  else
+    use_malloc="yes"
+    LIBS="-lcygwin"
+   fi
+  ENABLE_WINCONSOLE="@#"   
+elif test "$target_os" = "mingw32" 
+then
+  yap_cv_readline=no
+  ENABLE_WINCONSOLE=""   
+  INSTALL_COMMAND=install_win32
+  AC_CHECK_LIB(wsock32,main)
+  AC_CHECK_LIB(psapi,main)
+    if test "$prefix" = "NONE"
+    then
+      prefix="\${SYSTEMDRIVE}/Yap"
+    fi
+else
+  INSTALL_COMMAND="install_unix"
+  AC_CHECK_LIB(m,sin)
+  AC_CHECK_LIB(socket,socket)
+  dnl X/Open Networking is sometimes a separate library
+  AC_CHECK_LIB(xnet,getsockname)
+  AC_CHECK_LIB(nsl,main,
+	have_nsl=yes
+	,
+	have_nsl=no)
+fi
+
+if test "$yap_cv_readline" != "no"
+then
+  AC_CHECK_LIB(termcap,tgetent)
+  AC_CHECK_LIB(ncurses,main)
+  AC_CHECK_LIB(readline,readline)
+fi
+if test "$yap_cv_gmp" != "no"
+then
+  AC_CHECK_LIB(gmp,main)
+fi
+
+if test "$yap_cv_myddas" != "no"
+then
+	dnl check for mysql
+	AC_MSG_CHECKING(for main in -lmysqlclient)
+	AC_CACHE_VAL(yap_mysql,[
+	AC_TRY_COMPILE(
+		#include <mysql/mysql.h>
+		#include <stdio.h>
+		,
+		MYSQL *conn;
+		conn = mysql_init(NULL);	
+		,
+		yap_mysql=yes,yap_mysql=no)])
+	AC_MSG_RESULT($yap_mysql)
+	if test "$yap_mysql" = yes 
+	then
+                YAP_EXTRAS="$YAP_EXTRAS -DMYDDAS_MYSQL"
+		LIBS="$LIBS -L${yap_cv_myddas}/lib/mysql -lmysqlclient -lz -lcrypt -lnsl -lm -lc -lnss_files -lnss_dns -lresolv "
+	fi
+	
+	dnl check for odbc
+	AC_MSG_CHECKING(for main in -lodbc)
+	AC_CACHE_VAL(yap_odbc,[
+	AC_TRY_COMPILE(
+		#include <sql.h>
+		#include <sqlucode.h>
+		#include <stdio.h>
+		,
+		SQLHENV henv;
+  		SQLAllocHandle(SQL_HANDLE_ENV, SQL_NULL_HANDLE, &henv);
+		,
+		yap_odbc=yes,yap_odbc=no)])
+	AC_MSG_RESULT($yap_odbc)
+	if test "$yap_odbc" = yes 
+	then
+		YAP_EXTRAS="$YAP_EXTRAS -DMYDDAS_ODBC"
+		LIBS="$LIBS -lodbc "
+	fi
+	
+	if test "$yap_mysql" = no -a "$yap_odbc" = no
+	then
+		echo "-------------------------------"
+	    	echo "--"
+	    	echo "--"
+	    	echo "--"
+	    	echo "-- There\'s no devel libraries for MySQL or ODBC"
+	    	echo "--"
+	    	echo "--"
+	    	echo "--"
+	    	echo "-------------------------------"
+	    	exit
+	fi
+
+	if test "$cutc" = no
+	then
+		echo
+		echo
+		echo "********************************************************"
+		echo
+		echo
+		echo "!!!!!! WARNING !!!!!!"
+		echo "The MYDDAS interface makes no sense without cut-c"
+		echo "Please contact tiagosoares@ncc.up.pt for help"
+		echo 
+		echo "Enabling cut-c"
+		echo
+		echo "********************************************************"
+		echo
+		echo
+		cutc="yes"
+	fi
+fi	
+
+if test "$myddasstats" = "yes"
+  then
+  YAP_EXTRAS="$YAP_EXTRAS -DMYDDAS_STATS"
+fi
+
+if test "$myddastoplevel" = "yes"
+  then
+  YAP_EXTRAS="$YAP_EXTRAS -DMYDDAS_TOP_LEVEL"
+fi
+
+if test "$threads" = yes
+then
+  AC_DEFINE(SUPPORT_THREADS, 1)
+  AC_CHECK_LIB(pthread,pthread_create)
+  AC_CHECK_HEADERS(pthread.h)	
+  AC_CHECK_FUNCS(pthread_mutexattr_setkind_np pthread_mutexattr_settype)
+  if test "$pthreadlocking" = yes
+  then
+    AC_DEFINE(USE_PTHREAD_LOCKING, 1)
+  fi
+  use_malloc=yes
+fi
+
+if test "$yap_cv_jpl" = no
+then
+	ENABLE_JPL="@#"   
+else
+	ENABLE_JPL=""
+	JAVA_HOME="$yap_cv_jpl"
+	JAVAC="$yap_cv_jpl"/bin/javac
+	JAR="$yap_cv_jpl"/bin/jar
+fi
+
+LAM_MPI_CC=${MPI_CC}
+MPI_OBJS=
+if test "$yap_cv_mpi" != "no"
+then
+  OLD_CC=${CC}
+  CC=${MPI_CC}
+  AC_CHECK_LIB(mpi,MPI_Init,
+		[AC_DEFINE(HAVE_LIBMPI, 1)],
+		[AC_DEFINE(HAVE_LIBMPI, 0)])
+  if test "$ac_cv_lib_mpi_MPI_Init" = yes
+  then
+	#YAPMPILIB=YapMPI.a
+	MPI_OBJS=mpi.o
+  else
+    AC_CHECK_LIB(mpich,MPI_Init,
+		[AC_DEFINE(HAVE_LIBMPICH, 1)],
+		[AC_DEFINE(HAVE_LIBMPICH, 0)])
+    if test "$ac_cv_lib_mpich_MPI_Init" = yes
+    then
+	#YAPMPILIB=YapMPI.a
+	MPI_OBJS=mpi.o
+    else
+	#YAPMPILIB=
+	MPI_CC=${CC}
+    fi
+  fi
+  CC=${OLD_CC}
+else
+#   MPI_CC=${MPI_CC}
+  MPI_CC=${CC}
+fi
+
+
+MPI_LIBS=
+if test "$yap_cv_mpi" != "no" -a "$yap_cv_mpe" != "no"
+then
+  OLD_CC=${CC}
+  CC=${MPI_CC}
+  AC_CHECK_LIB(mpe,MPE_Init_log,
+		[AC_DEFINE(HAVE_LIBMPE, 1)],
+		[AC_DEFINE(HAVE_LIBMPE, 0)])
+  if test "$ac_cv_lib_mpe_MPE_Init_log" = yes
+  then
+	MPI_LIBS="-lmpe"
+	MPI_OBJS="$MPI_OBJS mpe.o"
+  fi
+  CC=${OLD_CC}
+fi
+
+AC_PROG_CPP
+
+if test "$cross_compiling" = "yes"
+then
+  YAP_EXTRAS=
+else
+  AC_SYS_RESTARTABLE_SYSCALLS
+fi
+
+
+dnl defaults
+INSTALL_DLLS="#"
+EXTRA_OBJS=""
+SHLIB_LD="@#"
+DO_SECOND_LD="#"
+M4="m4"
+MERGE_DLL_OBJS="#"
+IN_UNIX=""
+
+dnl This has to be before $target_os
+YAPLIB="libYap.a"
+
+case "$target_os" in
+      *linux*)
+        if test "$use_condor" = "no"
+        then
+	  AC_CHECK_LIB(dl,dlopen,
+	     have_dl=yes
+	   ,
+	     have_dl=no)
+          if test "$have_dl" = "yes"
+	  then
+	    SHLIB_SUFFIX=".so"
+            SHLIB_LD="gcc -shared -export-dynamic"
+            DO_SECOND_LD=""
+	    LIBS="$LIBS -ldl"
+	    case "$host_cpu" in
+	      alpha*)
+	        LDFLAGS="-dynamic $LDFLAGS"
+              ;;
+              *)
+	      	JAVALIBPATH="-L$JAVA_HOME/jre/lib/i386 -L$JAVA_HOME/jre/lib/i386/client"
+		JAVAINCPATH="-I$JAVA_HOME/include -I$JAVA_HOME/include/linux"
+	        if test "$CC" != "lcc"
+                then
+	          LDFLAGS="-rdynamic $LDFLAGS"
+                fi
+              ;;
+            esac
+          fi
+	  if test "$ac_cv_prog_gcc" = "yes"
+	  then
+	   SHLIB_CFLAGS="-shared -fPIC"
+	   INSTALL_DLLS=""
+          fi
+        fi
+        if test "$have_nsl" = yes
+	 then
+	 LIBS="$LIBS -lnsl"
+        fi
+	;;
+      *sunos4*)
+	M4="/usr/5bin/m4"
+	LDFLAGS="$LDFLAGS -N"
+        if test "$have_nsl" = yes
+	 then
+	 LIBS="$LIBS -lnsl"
+        fi
+        SHLIB_SUFFIX=".o"
+	INSTALL_DLLS=""
+	;;
+      *hpux*)
+	#do not use the first memory quadrant
+	AC_DEFINE(FORCE_SECOND_QUADRANT)
+	M4="/usr/bin/m4"
+	if test ${use_condor} = no
+        then
+	  SHLIB_INTERFACE="load_shl.o"
+	  if test "$CC" = cc -o "$CC" = c89
+	  then
+	    #this tells ld to export all non-static symbols,
+	    #otherwise no external predicates.
+	    SHLIB_LD="ld -b -E ${LDFLAGS}"
+            DO_SECOND_LD=""
+            SHLIB_SUFFIX=".sl"
+	    SHLIB_CFLAGS="+z"
+	    INSTALL_DLLS=""
+	    # If the xnet library was found, turn on X/Open networking
+	    if test "$ac_cv_lib_xnet_getsockname" = yes
+	    then
+	     AC_DEFINE(_XOPEN_SOURCE)
+	     AC_DEFINE(_XOPEN_SOURCE_EXTENDED,1)
+	    fi
+	  else
+	    INSTALL_DLLS="#"
+          fi
+        fi
+	#do not use realloc() from HP-UX 10.20 together with MPI
+	if test ${target_os} = hpux10.20
+	then
+	  AC_DEFINE(MPI_AVOID_REALLOC,1)
+	fi
+	;;
+      *aix*)
+	# To actually use dlls in AIX I'd need to build YAP as a DLL first.
+	# I won't bother for now.
+	#
+        # SHLIB_SUFFIX=".a"
+        #SHLIB_LD="\$(srcdir)/../../ldAix /bin/ld -bhalt:4 -bM:SRE -bE:lib.exp -H512 -T512 -bnoentry"
+	#INSTALL_DLLS=""
+	;;
+      *osf*)
+        if ${use_condor} = no
+        then
+	  AC_CHECK_LIB(dl,dlopen,
+dnl Linux has both elf and a.out, in this case we found elf
+	     have_dl=yes
+	   ,
+	     have_dl=no)
+          SHLIB_SUFFIX=".so"
+          SHLIB_LD="ld -shared -expect_unresolved '*'"
+          DO_SECOND_LD=""
+        fi
+	;;
+      *irix6*)
+	SHLIB_CFLAGS=""
+	SHLIB_SUFFIX=".so"
+        DO_SECOND_LD=""
+	SHLIB_LD="ld -n32 -shared -rdata_shared"
+	INSTALL_DLLS=""
+	;;
+      *darwin*)
+	if test ${use_dlcompat} = yes
+	then
+	  AC_CHECK_LIB(dl,dlopen,
+	     have_dl=yes
+	   ,
+	     have_dl=no)
+	  if test ${have_dl} = yes
+	  then
+	    LIBS="$LIBS -ldl"	  
+	  fi
+	fi
+	LIBS="$LIBS -framework JavaVM"
+	SHLIB_CFLAGS="-fno-common"
+	SHLIB_SUFFIX=".dylib"
+        DO_SECOND_LD=""
+	SHLIB_LD="$CC -bundle -flat_namespace -undefined suppress"
+	INSTALL_DLLS=""
+        CC="$CC -no-cpp-precomp"
+	JAVALIBPATH="-L/System/Library/Frameworks/JavaVM.framework/Libraries"
+	JAVAINCPATH="-I/System/Library/Frameworks/JavaVM.framework/Headers"
+	;;
+      *netbsd*|*freebsd*)
+	if echo __ELF__ | ${CC:-cc} -E - | grep -q __ELF__
+        then
+	  #an a.out system 	
+	  SHLIB_CFLAGS=""
+	  SHLIB_SUFFIX=".o"
+        else
+	  #an elf system
+	  LDFLAGS="-Wl,--export-dynamic $LDFLAGS"
+	  SHLIB_CFLAGS="-fPIC"
+	  SHLIB_LD="ld -Bshareable -x"
+          DO_SECOND_LD=""
+	  SHLIB_SUFFIX=".so"
+	  INSTALL_DLLS=""
+        fi
+	;;
+      *cyg*|*mingw*)
+	# gcc on cygwin seems to have trouble with longjmp
+        # and -fomit-frame-point -DBP_FREE
+	YAPLIB="libWYap.a"
+	SHLIB_CFLAGS=""
+        SHLIB_LD="\$(CC) -shared ../../yap.dll"
+	SHLIB_SUFFIX=".dll"
+	C_PARSER_FLAGS="$C_INTERF_FLAGS"
+	LDFLAGS="-Wl,--large-address-aware $LDFLAGS"
+	EXEC_SUFFIX=".exe"
+	INSTALL_DLLS=""
+	DO_SECOND_LD=""
+	MERGE_DLL_OBJS=""
+	IN_UNIX="#"
+	;;
+      *)
+	AC_CHECK_LIB(dl,dlopen,
+	   have_dl=yes
+	 ,
+	   have_dl=no)
+        if test "$have_dl" = yes
+	 then
+         SHLIB_SUFFIX=".o"
+	 LIBS="$LIBS -ldl"
+	 INSTALL_DLLS=""
+	 if test "$CC" = gcc
+	 then
+	   SHLIB_CFLAGS="-fPIC"
+	 fi
+        fi
+        if test "$have_nsl" = yes
+	 then
+	 LIBS="$LIBS -lnsl"
+        fi
+	;;
+esac
+
+if test "$dynamic_loading" = "yes"
+then 
+  YAP_EXTRAS="$SHLIB_CFLAGS $YAP_EXTRAS"
+  CROSS_SIMULATOR="LD_LIBRARY_PATH=."
+  case "$target_os" in
+  *darwin*)
+    DYNYAPLIB=libYap"$SHLIB_SUFFIX"
+    YAPLIB="$DYNYAPLIB"
+    DYNLIB_LD="gcc -dynamiclib"
+    ;;
+  *)
+       case "$target_cpu" in
+        i*86*)
+        JAVA_TARGET=i386
+        ;;
+        x86*)
+        JAVA_TARGET=amd64
+        ;;
+        sparc*)
+        JAVA_TARGET=sparc
+        ;;
+       esac
+    LDFLAGS="$LDFLAGS -Wl,-R,$prefix/lib  -Wl,-R,$JAVA_HOME/jre/lib/$JAVA_TARGET"
+    DYNYAPLIB=libYap"$SHLIB_SUFFIX"
+    YAPLIB="$DYNYAPLIB"
+    DYNLIB_LD="$SHLIB_LD"
+    ;;
+  esac
+else
+  DYNYAPLIB=libYap.notused
+fi
+
+if test "$coroutining" = "yes"
+  then
+  YAP_EXTRAS="$YAP_EXTRAS -DCOROUTINING=1"
+fi
+  
+if test "$rationaltrees" = "yes"
+  then
+  YAP_EXTRAS="$YAP_EXTRAS -DRATIONAL_TREES=1"
+fi
+
+if test "$rationaltrees" = "yes" -a "$coroutining" = "yes"
+  then
+  INSTALLCLP=""
+  else
+  INSTALLCLP="#"
+fi
+  
+if test "$debugyap" = "yes"
+  then
+  YAP_EXTRAS="$YAP_EXTRAS -DDEBUG=1"
+fi
+
+if test "$eam" = "yes"
+  then
+  YAP_EXTRAS="$YAP_EXTRAS -DBEAM"
+fi
+  
+if test "$wamprofile" = "yes"
+  then
+  YAP_EXTRAS="$YAP_EXTRAS -DANALYST=1"
+fi
+  
+if test "$depthlimit" = "yes"
+  then
+  YAP_EXTRAS="$YAP_EXTRAS -DDEPTH_LIMIT=1"
+fi
+  
+if test "$use_april" = "yes"
+  then	
+   YAP_EXTRAS="$YAP_EXTRAS -DDEPTH_LIMIT=1 -DAPRIL"
+   LDFLAGS="$LDFLAGS -L."
+   LIBS="$LIBS -lApril"
+fi
+  
+if test "$lowleveltracer" = "yes"
+  then
+  YAP_EXTRAS="$YAP_EXTRAS -DLOW_LEVEL_TRACER=1"
+fi
+  
+if test "$threads" = "yes"
+  then
+  YAP_EXTRAS="$YAP_EXTRAS -DTHREADS=1"
+  if test "$GCC" = "yes"
+  then
+    YAP_EXTRAS="$YAP_EXTRAS -D_GNU_SOURCE"
+  fi
+fi
+  
+case "$orparallelism" in
+  sba)
+   YAP_EXTRAS="$YAP_EXTRAS -DSBA=1"
+  ;;
+  a-cow)
+   YAP_EXTRAS="$YAP_EXTRAS -DACOW=1"
+  ;;
+  yes|env-copy)
+   YAP_EXTRAS="$YAP_EXTRAS -DENV_COPY=1"
+  ;;
+esac
+
+if test "$cutc" = "yes"
+  then
+  YAP_EXTRAS="$YAP_EXTRAS -DCUT_C=1"
+fi
+
+if test "$tabling" = "yes"
+  then
+  YAP_EXTRAS="$YAP_EXTRAS -DTABLING=1"
+fi
+if test ! "$yap_cv_cplint" = "no"
+  then	
+	GLIBS=`glib-config --libs glib` 
+	GFLAGS=`glib-config --cflags glib`
+	CPLINT_LIBS=${CPLINT_LIBS}$GLIBS
+	CPLINT_CFLAGS=" $GFLAGS "
+	CPLINT_LDFLAGS=" `echo $GLIBS | awk '{print $1}'` -L/usr/local/lib/"
+		LDFLAGS=${LDFLAGS}" `echo $GLIBS | awk '{print $1}'` -L/usr/local/lib/"
+	if test ! "$yap_cv_cplint" = "yes"
+	then
+		LDFLAGS+=" -L${yap_cv_cplint}/lib"
+		CPLINT_LDFLAGS+=" -L${yap_cv_cplint}/lib"
+		CPLINT_CFLAGS+=" -I${yap_cv_cplint}/include"
+	fi
+	AC_SEARCH_LIBS([g_hash_table_new], [glib], [CPLINT_LIBS="-lglib "], [AC_MSG_ERROR([This package needs glib.], [1])], [])
+	AC_SEARCH_LIBS([array_do_alloc], [glu], [CPLINT_LIBS="-lglu "$CPLINT_LIBS], [AC_MSG_ERROR([This package needs glu.], [1])], [])
+	AC_SEARCH_LIBS([Cudd_Init], [cu], [CPLINT_LIBS="-lcu "$CPLINT_LIBS], [AC_MSG_ERROR([This package needs glu.], [1])], [-lglu -lm])
+	ENABLE_CPLINT=""
+	if test "$target_os" = "cygwin" -o "$target_os" = "mingw32" 
+	then
+		CPLINT_SHLIB_LD="gcc -shared ../yap.dll"
+	else
+		CPLINT_SHLIB_LD=$SHLIB_LD
+	fi
+	AC_SUBST(CPLINT_LIBS)
+	AC_SUBST(CPLINT_CFLAGS)
+	AC_SUBST(CPLINT_LDFLAGS)
+	AC_SUBST(CPLINT_SHLIB_LD)
+else
+	ENABLE_CPLINT="#"
+fi
+AC_SUBST(ENABLE_CPLINT)
+
+# LAM
+OLD_CC=${CC}	
+CC=${LAM_MPI_CC}
+AC_CHECK_LIB([lam], [main],
+	LAMOBJS=yap_mpi"$SHLIB_SUFFIX",
+	LAMOBJS=no)
+CC=${OLD_CC}
+
+dnl Checks for header files.
+AC_HEADER_STDC
+AC_HEADER_SYS_WAIT
+AC_CHECK_HEADERS(arpa/inet.h ctype.h direct.h dirent.h dlfcn.h)
+AC_CHECK_HEADERS(errno.h fcntl.h)
+AC_CHECK_HEADERS(fenv.h fpu_control.h ieeefp.h io.h limits.h)
+AC_CHECK_HEADERS(malloc.h math.h memory.h mpi.h)
+AC_CHECK_HEADERS(netdb.h netinet/in.h regex.h)
+AC_CHECK_HEADERS(siginfo.h signal.h stdarg.h string.h stropts.h)
+AC_CHECK_HEADERS(sys/conf.h sys/file.h)
+AC_CHECK_HEADERS(sys/mman.h sys/param.h sys/resource.h sys/select.h)
+AC_CHECK_HEADERS(sys/shm.h sys/socket.h sys/stat.h)
+AC_CHECK_HEADERS(sys/time.h sys/times.h sys/types.h)
+AC_CHECK_HEADERS(sys/ucontext.h sys/un.h)
+AC_CHECK_HEADERS(time.h unistd.h wctype.h winsock.h winsock2.h)
+AC_CHECK_HEADERS(mach-o/dyld.h)
+if test "$yap_cv_gmp" != "no"
+then
+  AC_CHECK_HEADERS(gmp.h)
+fi
+if test "$yap_cv_myddas" != "no"
+then
+  AC_CHECK_HEADERS(mysql/mysql.h)
+fi
+if test "$yap_cv_readline" != "no"
+then
+  AC_CHECK_HEADERS( readline/readline.h)
+fi
+AC_CHECK_HEADERS(mpi.h)
+AC_CHECK_HEADERS(mpe.h)
+
+dnl Checks for typedefs, structures, and compiler characteristics.
+AC_C_INLINE
+AC_STRUCT_TM
+AC_CHECK_SIZEOF(int *,4)
+AC_CHECK_SIZEOF(short int,2)
+AC_CHECK_SIZEOF(int,4)
+AC_CHECK_SIZEOF(long int,4)
+AC_CHECK_SIZEOF(long long int,8)
+AC_CHECK_SIZEOF(float,4)
+AC_CHECK_SIZEOF(double,8)
+
+dnl check type of malloc (i.e. char *  or void *)
+AC_MSG_CHECKING(for type of malloc)
+AC_CACHE_VAL(yap_cv_malloct,[
+AC_TRY_RUN(
+	#include <stdlib.h>
+	char *malloc(size_t);
+	int main() {
+	   void *p=malloc(1);
+	   return 0;
+	}
+	,
+	yap_cv_malloct=char,yap_cv_malloct=void,yap_cv_malloct=void)])
+AC_MSG_RESULT($yap_cv_malloct *)
+if test "$yap_cv_malloct" = void
+then AC_DEFINE(MALLOC_T,void *)
+else AC_DEFINE(MALLOC_T,char *)
+fi
+
+
+dnl check how to generate headers (i.e. should we use GCC inline?)
+AC_MSG_CHECKING(for gcc inline)
+AC_CACHE_VAL(yap_cv_gcc,[
+AC_TRY_RUN(
+	#undef inline
+	inline int f(int x) {return x+1;}
+	int main() { return 0;}
+	,
+	yap_cv_gcc=yes,yap_cv_gcc=no,yap_cv_gcc=yes)])
+AC_MSG_RESULT($yap_cv_gcc)
+if test "$yap_cv_gcc" = yes 
+then
+M4GENHDRS=m4/gcc_genhdrs.m4
+AC_DEFINE(HAVE_GCC,1)
+else
+M4GENHDRS=m4/cc_genhdrs.m4
+AC_DEFINE(HAVE_GCC,0)
+fi
+AC_SUBST(M4)
+AC_SUBST(M4GENHDRS)
+
+dnl System stuff for dynamic linking.
+dnl
+dnl Exports:
+dnl
+dnl "" if we can do dynamic linking, "#" otherwise
+AC_SUBST(INSTALL_DLLS)
+dnl if we need to merge several .o files into a single dll.
+AC_SUBST(MERGE_DLL_OBJS)
+dnl C-flags used to compile a file that will be loaded dynamically
+AC_SUBST(SHLIB_CFLAGS)
+dnl suffix for loadable binary (.so,.dll,.o)
+AC_SUBST(SHLIB_SUFFIX)
+dnl suffix for executable (.exe)
+EXEC_SUFFIX=""
+AC_SUBST(EXEC_SUFFIX)
+dnl how to call the loader
+AC_SUBST(DO_SECOND_LD)
+AC_SUBST(SHLIB_LD)
+AC_SUBST(DYNLIB_LD)
+dnl objects in YAP library
+AC_SUBST(YAPLIB)
+AC_SUBST(DYNYAPLIB)
+AC_SUBST(LDFLAGS)
+dnl install_info
+AC_SUBST(INSTALL_INFO)
+dnl let YAP_EXTRAS fall through configure, from the env into Makefile
+AC_SUBST(YAP_EXTRAS)
+AC_SUBST(NO_BUILTIN_REGEXP)
+AC_SUBST(ENABLE_JPL)
+AC_SUBST(JAVA_HOME)
+AC_SUBST(JAVAC)
+AC_SUBST(JAR)
+AC_SUBST(IN_UNIX)
+AC_SUBST(YAPMPILIB)
+AC_SUBST(LAM_MPI_CC)
+AC_SUBST(MPI_OBJS)
+AC_SUBST(MPI_LIBS)
+AC_SUBST(INSTALL_COMMAND)
+AC_SUBST(CROSS_SIMULATOR)
+AC_SUBST(INSTALLCLP)
+AC_SUBST(JAVALIBPATH)
+AC_SUBST(JAVAINCPATH)
+AC_SUBST(LAMOBJS)
+AC_SUBST(MAX_WORKERS)
+AC_SUBST(STATIC_MODE)
+AC_SUBST(ENABLE_WINCONSOLE)
+
+AC_SUBST(INSTALL_MATLAB)
+AC_SUBST(MATLAB_INCLUDE)
+
+dnl check for threaded code
+AC_MSG_CHECKING(for gcc threaded code)
+AC_CACHE_VAL(yap_cv_threaded_code,[
+AC_TRY_RUN(
+	int main() {
+	void *t = &&l2;
+	l1: goto *t;
+	l2: return 0;
+}
+	,
+	yap_cv_threaded_code=yes,yap_cv_threaded_code=no,yap_cv_threaded_code=yes)])
+AC_MSG_RESULT($yap_cv_threaded_code)
+if test "$yap_cv_threaded_code" = yes && test "$yap_cv_gcc" = yes
+then
+	AC_DEFINE(USE_THREADED_CODE,1)
+	M4GENABSMI=gen_gcc.m4
+else	
+	AC_DEFINE(USE_THREADED_CODE,0)
+	M4GENABSMI=gen_ansi.m4
+fi
+
+AC_SUBST(M4GENABSMI)
+
+
+dnl check for IEEE floats
+AC_MSG_CHECKING(for IEEE floats)
+AC_CACHE_VAL(yap_cv_ffieee,[
+AC_TRY_RUN(
+	int main() {
+	  union { float f; int i} a;
+	  a.f = 1;
+	  if (a.i==0x3f800000) return 0;
+	  return 1;
+	}
+	,
+	yap_cv_ffieee=yes,yap_cv_ffieee=no,yap_cv_ffieee=yes)])
+AC_MSG_RESULT($yap_cv_ffieee)
+if test "$yap_cv_ffieee" = yes 
+then
+AC_DEFINE(FFIEEE,1)
+else
+AC_DEFINE(FFIEEE,0)
+fi
+
+dnl check for sigsetjmp
+AC_MSG_CHECKING(for sigsetjmp)
+AC_CACHE_VAL(yap_sigsetjmp,[
+AC_TRY_COMPILE(
+	#include <setjmp.h>
+	,
+	sigjmp_buf         RestartEnv;
+
+	siglongjmp (RestartEnv, 1);
+	,
+	yap_sigsetjmp=yes,yap_sigsetjmp=no)])
+AC_MSG_RESULT($yap_sigsetjmp)
+if test "$yap_sigsetjmp" = yes 
+then
+AC_DEFINE(HAVE_SIGSETJMP,1)
+else
+AC_DEFINE(HAVE_SIGSETJMP,0)
+fi
+
+dnl check for sigsegv
+AC_MSG_CHECKING(for sigsegv)
+AC_CACHE_VAL(yap_sigsegv,[
+AC_TRY_COMPILE(
+	#include <signal.h>
+	#include <stdio.h>
+	,
+	printf("Signal value is %d\n", SIGSEGV);
+	,
+	yap_sigsegv=yes,yap_sigsegv=no)])
+AC_MSG_RESULT($yap_sigsegv)
+if test "$yap_sigsegv" = yes 
+then
+AC_DEFINE(HAVE_SIGSEGV,1)
+else
+AC_DEFINE(HAVE_SIGSEGV,0)
+fi
+
+dnl check for sigsegv
+AC_MSG_CHECKING(for sigprof)
+AC_CACHE_VAL(yap_sigprof,[
+AC_TRY_COMPILE(
+	#include <signal.h>
+	#include <stdio.h>
+	,
+	printf("Signal value is %d\n", SIGPROF);
+	,
+	yap_sigprof=yes,yap_sigprof=no)])
+AC_MSG_RESULT($yap_sigprof)
+if test "$yap_sigsegv" = yes 
+then
+AC_DEFINE(HAVE_SIGPROF,1)
+else
+AC_DEFINE(HAVE_SIGPROF,0)
+fi
+
+dnl check for siginfo
+AC_MSG_CHECKING(for siginfo)
+AC_CACHE_VAL(yap_siginfo,[
+AC_TRY_COMPILE(
+	#include <signal.h>
+	#include <stdio.h>
+	,
+	printf("SIGINFO value is %d\n", SA_SIGINFO);
+	,
+	yap_siginfo=yes,yap_siginfo=no)])
+AC_MSG_RESULT($yap_siginfo)
+if test "$yap_siginfo" = yes 
+then
+AC_DEFINE(HAVE_SIGINFO,1)
+else
+AC_DEFINE(HAVE_SIGINFO,0)
+fi
+
+dnl this is copied from the Tcl code
+dnl this code checks whether the system defines an union wait
+AC_MSG_CHECKING([union wait])
+AC_TRY_LINK([#include <sys/types.h> 
+#include <sys/wait.h>], [
+union wait x;
+wait(&x);		/* make sure we can compile wait */
+WIFEXITED(x);		/* Generates compiler error if WIFEXITED
+			 * uses an int. */
+], union_wait_ok=yes, union_wait_ok=no)
+AC_MSG_RESULT($union_wait_ok)
+if test "$union_wait_ok" = no; then
+    AC_DEFINE(NO_UNION_WAIT)
+fi
+
+dnl check whether the system supports the environ variable
+AC_MSG_CHECKING([environ])
+AC_TRY_LINK([], [
+extern char **environ;
+], environ_ok=yes, environ_ok=no)
+AC_MSG_RESULT($environ_ok)
+if test "$environ_ok" = yes; then
+    AC_DEFINE(HAVE_ENVIRON)
+fi
+
+dnl Checks for library functions.
+AC_TYPE_SIGNAL
+AC_CHECK_FUNCS(acosh asinh atanh chdir ctime dlopen dup2)
+AC_CHECK_FUNCS(fesettrapenable fgetpos finite getcwd getenv)
+AC_CHECK_FUNCS(gethostbyname gethostid gethostname)
+AC_CHECK_FUNCS(gethrtime getpwnam getrusage gettimeofday getwd)
+AC_CHECK_FUNCS(isatty isnan kill labs link lgamma)
+AC_CHECK_FUNCS(localtime lstat mallinfo)
+AC_CHECK_FUNCS(memcpy memmove mkstemp mktemp)
+AC_CHECK_FUNCS(nanosleep mktime opendir)
+AC_CHECK_FUNCS(putenv rand random readlink regexec)
+AC_CHECK_FUNCS(rename rint rl_set_prompt sbrk select)
+AC_CHECK_FUNCS(setbuf setitimer setlinebuf sigaction)
+AC_CHECK_FUNCS(siggetmask siginterrupt)
+AC_CHECK_FUNCS(signal sigprocmask socket stat)
+AC_CHECK_FUNCS(strchr strerror strncat strncpy strtod)
+AC_CHECK_FUNCS(time times tmpnam usleep vsnprintf)
+
+AC_CHECK_FUNC(regexec, [NO_BUILTIN_REGEXP="#"], [NO_BUILTIN_REGEXP=""])
+
+AC_CHECK_FUNCS(NSLinkModule)
+
+if test "$use_condor" = "no"
+then
+  AC_CHECK_FUNCS(alarm mmap popen shmat sleep system ttyname waitpid)
+fi
+
+if test "$target_os" != "mingw32" 
+then
+  AC_CHECK_FUNCS(fetestexcept snprintf)
+fi
+
+dnl check for mpz_xor
+AC_MSG_CHECKING(for mpz_xor)
+AC_CACHE_VAL(yap_mpz_xor,[
+AC_TRY_LINK(
+	#include <gmp.h>
+	void check(mpz_t rop,mpz_t op1,mpz_t op2) {
+	  mpz_xor(rop,op1,op2);
+	}
+	,
+	,
+	yap_mpz_xor=yes,yap_mpz_xor=no)])
+AC_MSG_RESULT($yap_mpz_xor)
+if test "$yap_mpz_xor" = yes 
+then
+AC_DEFINE(HAVE_MPZ_XOR,1)
+else
+AC_DEFINE(HAVE_MPZ_XOR,0)
+fi
+
+if test "$use_malloc" = "yes" -a "$maxmemory" = "yes" 
+then
+  maxmemory="no"
+fi
+
+dnl On some systems doing a fflush(NULL) to flush all output streams
+dnl has the side-effect of makeing all charactes waiting in input
+dnl pipes disapear.
+AC_CACHE_CHECK(
+[if fflush(NULL) clobbers input pipes],
+[yap_cv_broken_fflush_null],
+[ cat >conftest.$ac_ext <<EOF
+  #include <stdio.h>
+  #include <stdlib.h>
+  int main(int argc, char **argv)
+  {
+      char *buf;
+      int i;
+      char *bp;
+      bp = buf = malloc(1024);
+      while (1) {
+          while ((i = getc(stdin)) != -1
+                 && (*bp++ = i) != '\n'
+                 && (bp - buf < 1024) )
+    	  /* DO NOTHING */ ;
+          *bp = '\0';
+          fprintf(stdout, "%s", buf);
+          fflush(NULL);
+          if( i == EOF ) return 0;
+          bp = buf;
+      }
+  }
+EOF
+  AC_TRY_EVAL(ac_link)
+  if test "$?" = 0
+  then
+    cat conftest.$ac_ext | ./conftest$ac_exeext > conftest.out
+    AC_TRY_COMMAND(cmp conftest.$ac_ext conftest.out)
+    if test "$?" = 0
+    then
+      AC_MSG_RESULT(no)
+      yap_cv_broken_fflush_null=no
+    else
+      AC_MSG_RESULT(yes)
+      yap_cv_broken_fflush_null=yes
+    fi
+  else
+    dnl This should never happen
+    AC_MSG_RESULT(failed)
+    yap_cv_broken_fflush_null=failed
+  fi
+  rm -f conftest.$ac_ext conftest.$ac_objext conftest$ac_exeext conftest.out ])
+if test "$yap_cv_broken_fflush_null" = no
+then
+  AC_DEFINE(BROKEN_FFLUSH_NULL,0)
+else
+  dnl be conservative: if the test failed, assume fflush(NULL) is
+  dnl not working properly
+  AC_DEFINE(BROKEN_FFLUSH_NULL,1)
+fi
+
+dnl disable smart memory management
+if test "$use_malloc" = yes 
+then
+AC_DEFINE(USE_SYSTEM_MALLOC,1)
+AC_DEFINE(GC_NO_TAGS,1)
+fi
+
+dnl large memory configuration, don't trust Yap allocation routines
+if test "$maxmemory" = yes
+then
+AC_DEFINE(GC_NO_TAGS,1)
+if test "$orparallelism" != yes
+then
+AC_DEFINE(USE_DL_MALLOC,1)
+fi
+fi
+
+mkdir -p  library/matrix
+mkdir -p  library/matlab
+mkdir -p  library/mpi
+mkdir -p  library/random
+mkdir -p  library/regex
+mkdir -p  library/system
+mkdir -p  library/tries
+mkdir -p  library/rltree
+mkdir -p  library/lammpi
+mkdir -p  library/yap2swi
+mkdir -p  CHR
+mkdir -p  CLPQR
+mkdir -p  CLPBN
+mkdir -p  LGPL
+mkdir -p  LGPL/JPL
+mkdir -p  LGPL/JPL/java
+mkdir -p  LGPL/JPL/java/jpl
+mkdir -p  LGPL/JPL/java/jpl/fli
+mkdir -p  LGPL/JPL/java/jpl/test
+mkdir -p  LGPL/JPL/src
+mkdir -p  LGPL/clp
+mkdir -p  LGPL/chr
+mkdir -p  LGPL/swi_console
+mkdir -p  GPL
+mkdir -p  GPL/clpqr
+mkdir -p  GPL/http
+mkdir -p  cplint
+
+AC_OUTPUT(Makefile library/matrix/Makefile library/matlab/Makefile library/regex/Makefile library/system/Makefile library/random/Makefile library/yap2swi/Makefile library/mpi/Makefile  .depend library/Makefile LGPL/Makefile LGPL/chr/Makefile LGPL/chr/chr_swi_bootstrap.yap CLPBN/Makefile LGPL/clp/Makefile GPL/clpqr/Makefile library/lammpi/Makefile library/tries/Makefile library/rltree/Makefile LGPL/swi_console/Makefile  LGPL/JPL/Makefile LGPL/JPL/src/Makefile LGPL/JPL/java/Makefile  LGPL/JPL/jpl_paths.yap GPL/http/Makefile GPL/Makefile  cplint/Makefile)
+
+make depend
+

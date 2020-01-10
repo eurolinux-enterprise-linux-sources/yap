@@ -1,0 +1,17 @@
+/COPYRIGHT/1.1.1.1/Mon Apr  9 19:53:45 2001//
+/Makefile.in/1.14/Thu Sep 30 21:16:20 2004//
+/WHATSNEW/1.1.1.1/Mon Apr  9 19:53:45 2001//
+/cclass.h/1.1.1.1/Mon Apr  9 19:53:45 2001//
+/cname.h/1.1.1.1/Mon Apr  9 19:53:45 2001//
+/collate.h/1.1.1.1/Mon Apr  9 19:53:45 2001//
+/engine.c/1.1.1.1/Mon Apr  9 19:53:45 2001//
+/regcomp.c/1.5/Thu Dec 16 06:08:57 2004//
+/regerror.c/1.1.1.1/Mon Apr  9 19:53:45 2001//
+/regex2.h/1.2/Tue Mar 12 15:54:01 2002//
+/regexec.c/1.4/Thu Dec 16 06:08:57 2004//
+/regexp.c/1.7/Tue Mar 25 22:03:14 2008//
+/regexp.def/1.1.1.1/Mon Apr  9 19:53:46 2001//
+/regfree.c/1.1.1.1/Mon Apr  9 19:53:46 2001//
+/utils.h/1.3/Tue Nov 12 19:53:52 2002//
+/yapregex.h/1.1.1.1/Mon Apr  9 19:53:46 2001//
+D
